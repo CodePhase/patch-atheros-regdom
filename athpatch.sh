@@ -40,6 +40,7 @@ function runPatch {
   [ ! -d ~/kernel ] && mkdir ~/kernel
   cd ~/kernel
   while [ ! -f "./kernel-${KVERSION}.src.rpm" ]; do
+    unset dlCmd
     read -p "Download kernel source [Y/n]? " inDL
     [ -z "$inDL" ] && inDL='y'
     if [[ "$inDL" =~ [yY] ]]; then
@@ -58,11 +59,12 @@ function runPatch {
             dlCmd="curl -O https://vault.centos.org/${DLLINK}/BaseOS/Source/SPackages/kernel-${KVERSION}.src.rpm"
             ;;
         *)
-          echo "Unrecognized input ${inDL}. Exiting"
-          exit 1
+          echo "Unrecognized input ${inDL}."
+          unset inDL
+          unset dlCmd
           ;;
       esac
-      eval "$dlCmd"
+      [ "$dlCmd" ] && eval "$dlCmd"
     else
       read -p "Place the file kernel-${KVERSION}.src.rpm in the directory $(pwd) and then press enter to continue" cont
     fi
@@ -84,7 +86,7 @@ function runPatch {
   make clean && make mrproper
   make mrproper
   cp /usr/lib/modules/${KVERSION}.x86_64/build/Module.symvers ./
-  cp /home/guy/rpmbuild/SOURCES/kernel-x86_64.config ./.config
+  cp ~/rpmbuild/SOURCES/kernel-x86_64.config ./.config
   make oldconfig && make prepare
   make scripts
   make M=drivers/net/wireless/ath
