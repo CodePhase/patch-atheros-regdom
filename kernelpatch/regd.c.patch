@@ -1,0 +1,21 @@
+--- regd.c.orig	2022-01-19 16:45:57.670059663 -0500
++++ kernel/linux-4.18.0-348.7.1.el8_5/drivers/net/wireless/ath/regd.c	2022-01-20 14:56:50.649220347 -0500
+@@ -43,12 +43,18 @@
+ 					 NL80211_RRF_NO_OFDM)
+ 
+ /* We allow IBSS on these on a case by case basis by regulatory domain */
++#ifdef CONFIG_ATH_USER_REGD
++#define ATH_5GHZ_5150_5350	REG_RULE(5150-10, 5350+10, 80, 0, 30, 0)
++#define ATH_5GHZ_5470_5850	REG_RULE(5470-10, 5850+10, 80, 0, 30, 0)
++#define ATH_5GHZ_5725_5850	REG_RULE(5725-10, 5850+10, 80, 0, 30, 0)
++#else
+ #define ATH_5GHZ_5150_5350	REG_RULE(5150-10, 5350+10, 80, 0, 30,\
+ 					 NL80211_RRF_NO_IR)
+ #define ATH_5GHZ_5470_5850	REG_RULE(5470-10, 5850+10, 80, 0, 30,\
+ 					 NL80211_RRF_NO_IR)
+ #define ATH_5GHZ_5725_5850	REG_RULE(5725-10, 5850+10, 80, 0, 30,\
+ 					 NL80211_RRF_NO_IR)
++#endif
+ 
+ #define ATH_2GHZ_ALL		ATH_2GHZ_CH01_11, \
+ 				ATH_2GHZ_CH12_13, \

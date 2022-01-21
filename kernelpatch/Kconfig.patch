@@ -1,0 +1,13 @@
+--- /home/guy/code/Kconfig	2021-03-15 20:45:56.860984075 -0400
++++ drivers/net/wireless/ath/Kconfig	2021-03-15 20:48:15.118963473 -0400
+@@ -22,6 +22,10 @@
+ 
+ if WLAN_VENDOR_ATH
+ 
++config ATH_USER_REGD
++	bool "Do not enforce EEPROM regulatory restrictions"
++	default y
++
+ config ATH_DEBUG
+ 	bool "Atheros wireless debugging"
+ 	---help---
