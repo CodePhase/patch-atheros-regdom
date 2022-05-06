@@ -1,5 +1,47 @@
 #!/bin/bash
 
+function setArgs {
+  unset optApply
+
+  while [ $# -gt 0 ]
+  do
+    case "$1" in
+      "-k"|"--kversion")
+        shift
+        KVERSION="$1"
+        shift
+        ;;
+      "--hot"|"--hotapply")
+        optApply=1
+        shift
+        ;;
+      "--reboot")
+        optApply=2
+        shift
+        ;;
+      "--install"|"--installonly")
+        optApply=3
+        shift
+        ;;
+      "--compile"|"--compileonly")
+        optApply=4
+        shift
+        ;;
+      "-h"|"--help")
+        shift
+        printHelp
+        ;;
+      *)
+        echo "Unrecognized input: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  ARCH=$(uname -i)
+  [ -z "$KVERSION" ] && KVERSION=$(basename -s ".${ARCH}" $(uname -r))
+}
+
 function hotApply {
   sudo rmmod ath10k_pci ath10k_core ath
   sudo modprobe ath10k_pci
@@ -26,8 +68,6 @@ function runPatch {
     echo "Required packages are missing: ${pkgsMissing[@]}"
     exit 1
   fi
-  
-  KVERSION=$(basename -s '.x86_64' $(uname -r))
   
   if [ -d ~/rpmbuild ]; then
     rm -rf ~/rpmbuild/
@@ -85,8 +125,8 @@ function runPatch {
   cd linux-${KVERSION}
   make clean && make mrproper
   make mrproper
-  cp /usr/lib/modules/${KVERSION}.x86_64/build/Module.symvers ./
-  cp ~/rpmbuild/SOURCES/kernel-x86_64.config ./.config
+  cp /usr/lib/modules/${KVERSION}.${ARCH}/build/Module.symvers ./
+  cp ~/rpmbuild/SOURCES/kernel-${ARCH}.config ./.config
   make oldconfig && make prepare
   make scripts
   make M=drivers/net/wireless/ath
@@ -95,22 +135,23 @@ function runPatch {
 function installDriver {
   echo "Installing driver"
   xz drivers/net/wireless/ath/ath.ko 
-  cp -f /lib/modules/${KVERSION}.x86_64/kernel/drivers/net/wireless/ath/ath.ko.xz ~/kernelpatch/kernel-${KVERSION}-${now}-ath.ko.xz.bak
-  sudo cp -f drivers/net/wireless/ath/ath.ko.xz /lib/modules/${KVERSION}.x86_64/kernel/drivers/net/wireless/ath/ath.ko.xz 
-  sudo depmod -a
+  cp -f /lib/modules/${KVERSION}.${ARCH}/kernel/drivers/net/wireless/ath/ath.ko.xz ~/kernelpatch/kernel-${KVERSION}.${ARCH}-${now}-ath.ko.xz.orig
+  cp -f drivers/net/wireless/ath/ath.ko.xz ~/kernelpatch/kernel-${KVERSION}.${ARCH}-${now}-ath.ko.xz.patched
+  sudo cp -f drivers/net/wireless/ath/ath.ko.xz /lib/modules/${KVERSION}.${ARCH}/kernel/drivers/net/wireless/ath/ath.ko.xz
+  sudo depmod -a ${KVERSION}.${ARCH}
 }
 
 function applyChanges {
   echo "Applying changes"
-  unset optApply
   while [ -z "$optApply" ]; do
     echo "Please choose an option number:"
     echo "1) Attempt hot-apply of new driver (Default)"
     echo "2) Reboot"
-    echo "3) Don't apply, just exit"
+    echo "3) Install driver and exit"
+    echo "4) Don't apply, just exit"
     read optApply
     [ -z "optApply" ] && optApply=1
-    if [[ ! "$optApply" =~ [123] ]]; then
+    if [[ ! "$optApply" =~ [1234] ]]; then
       unset optApply
     fi
   done
@@ -125,11 +166,14 @@ function applyChanges {
        rebootSystem
        ;;
     "3")
+       installDriver
+       ;;
+    "4")
        echo "Exiting without applying. Your driver is located at $(pwd)/drivers/net/wireless/ath/ath.ko"
        echo "To manually install it run:"
        echo "xz $(pwd)/drivers/net/wireless/ath/ath.ko"
-       echo "sudo cp -f $(pwd)/drivers/net/wireless/ath/ath.ko.xz /lib/modules/${KVERSION}.x86_64/kernel/drivers/net/wireless/ath/ath.ko.xz"
-       echo "sudo depmod -a"
+       echo "sudo cp -f $(pwd)/drivers/net/wireless/ath/ath.ko.xz /lib/modules/${KVERSION}.${ARCH}/kernel/drivers/net/wireless/ath/ath.ko.xz"
+       echo "sudo depmod -a ${KVERSION}.${ARCH}"
        echo "Then reboot or reload the 'ath' kernel module manually"
        exit 0
        ;;
@@ -139,5 +183,47 @@ function applyChanges {
   esac
 }
 
+function printHelp {
+  cat << EOS
+Installs a patch for the ath10k driver to allow use of 5GHz bands
+in world regulatory domains
+
+Usage: athpatch.sh
+       athpatch.sh [-h|--help]
+       athpatch.sh [-k|--kversion] [--hotapply|--reboot|--install|--compile]
+
+  Running the utility with no options will launch a question and answer system
+
+  -h
+  --help
+                Shows this help and exit
+  -k
+  --kversion
+                Specify the kernel version to patch (and optionally download)
+                The default is the currently running kernel version if this
+                option is not specified
+  --hotapply
+  --reboot
+  --install
+  --compile
+                Specify the application method
+                --hotapply:
+                    Attempt to apply the patch to the running kernel by removing
+                    the current ath10k driver and installing the patched version
+                    with minimal disruption
+                --reboot
+                    Automatically reboot the system after patched driver is installed
+                    Be careful, the reboot happens immediately after the install
+                --install
+                    Install the patched driver into the specified kernel's directory
+                    It will be initialized at next boot of that kernel
+                --compile:
+                    Only compile the driver and don't apply it at all
+EOS
+
+  exit 0
+}
+
+setArgs "$@"
 runPatch
 applyChanges
