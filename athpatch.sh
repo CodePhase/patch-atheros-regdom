@@ -126,8 +126,7 @@ function runPatch {
   make clean && make mrproper
   make mrproper
   cp /usr/lib/modules/${KVERSION}.${ARCH}/build/Module.symvers ./
-  cp ~/rpmbuild/SOURCES/kernel-${ARCH}.config ./.config
-  make oldconfig && make prepare
+  make oldconfig && make modules_prepare
   make scripts
   make M=drivers/net/wireless/ath
 }
